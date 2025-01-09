@@ -1,10 +1,10 @@
+use crate::dnt::{Column, FLOAT32, FLOAT64, Header, INT32, LPNNTS, UINT8, UINT32, WriteCell};
 use crate::io_utils::{create_reader, create_writer};
-use std::io::{self, Read, Write};
+use byteorder::WriteBytesExt;
+use read_from::{ReadFrom};
+use std::io::{self, Write};
 use std::path::PathBuf;
 use std::time::Instant;
-use byteorder::WriteBytesExt;
-use read_from::{ReadFrom, WriteTo};
-use crate::dnt::{Column, Header, WriteCell, FLOAT32, FLOAT64, INT32, LPNNTS, UINT32, UINT8};
 
 pub fn convert_to_tsv(input_path: &PathBuf, output_path: &PathBuf) -> io::Result<()> {
     let start = Instant::now();
@@ -16,7 +16,17 @@ pub fn convert_to_tsv(input_path: &PathBuf, output_path: &PathBuf) -> io::Result
 
     // header
     let header = Header::read_from(&mut reader)?;
-    println!("Rows: {:?}, Cols: {:?}", header.row_count, header.column_count);
+    if header.magic_number.0 != 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Unexpected magic number: {}", header.magic_number.0),
+        ));
+    }
+
+    println!(
+        "Rows: {:?}, Cols: {:?}",
+        header.row_count, header.column_count
+    );
 
     // columns
     let column_count = header.column_count.0 as usize + 1;
@@ -48,7 +58,12 @@ pub fn convert_to_tsv(input_path: &PathBuf, output_path: &PathBuf) -> io::Result
                 4 => FLOAT32::read_from(&mut reader)?.write_to(&mut writer)?,
                 5 => FLOAT32::read_from(&mut reader)?.write_to(&mut writer)?,
                 6 => FLOAT64::read_from(&mut reader)?.write_to(&mut writer)?,
-                x => return Err(io::Error::new(io::ErrorKind::InvalidData, format!("Invalid column type: {}", x))),
+                x => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("Invalid column type: {}", x),
+                    ));
+                }
             };
         }
         writer.write_u8(new_line)?;
@@ -58,20 +73,25 @@ pub fn convert_to_tsv(input_path: &PathBuf, output_path: &PathBuf) -> io::Result
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
-    use tempfile::TempDir;
     use super::*;
+    use tempfile::TempDir;
 
     #[test]
     fn test_conversion() {
         let temp_dir = TempDir::new().unwrap();
-        let temp_path = temp_dir.path().to_path_buf().join("skillleveltable_rune.tsv");
+        let temp_path = temp_dir
+            .path()
+            .to_path_buf()
+            .join("skillleveltable_rune.tsv");
         let test_path = PathBuf::from("./test/skillleveltable_rune.dnt");
         println!("Test output: {:?}", temp_path);
         convert_to_tsv(&test_path, &temp_path).unwrap();
         let digest = sha256::try_digest(temp_path).unwrap();
-        assert_eq!(digest, "7ec02650c896da60e172b8e53539eea2bda67cd7b23002d8c954a4d4fdece0b7");
+        assert_eq!(
+            digest,
+            "7ec02650c896da60e172b8e53539eea2bda67cd7b23002d8c954a4d4fdece0b7"
+        );
     }
 }

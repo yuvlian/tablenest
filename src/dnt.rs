@@ -1,7 +1,6 @@
-use std::fmt::{Display};
 use byteorder::{LittleEndian, ReadBytesExt};
+use read_from::ReadFrom;
 use std::io::{self, ErrorKind, Read, Write};
-use read_from::{ReadFrom};
 
 pub trait WriteCell {
     /// What error can happen when trying to write?
@@ -138,7 +137,6 @@ impl ReadFrom for Header {
             row_count: UINT32::read_from(&mut input)?,
         })
     }
-
 }
 
 #[derive(Debug, Clone)]
@@ -153,8 +151,7 @@ impl ReadFrom for Column {
     fn read_from<R: Read>(mut input: R) -> Result<Self, Self::Error> {
         Ok(Column {
             name: LPNNTS::read_from(&mut input)?,
-            data_type: UINT8::read_from(&mut input)?
+            data_type: UINT8::read_from(&mut input)?,
         })
     }
-
 }
