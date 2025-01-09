@@ -57,3 +57,21 @@ pub fn convert_to_tsv(input_path: &PathBuf, output_path: &PathBuf) -> io::Result
     println!("Conversion completed in {:?}", start.elapsed());
     Ok(())
 }
+
+
+#[cfg(test)]
+mod tests {
+    use tempfile::TempDir;
+    use super::*;
+
+    #[test]
+    fn test_conversion() {
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_path_buf().join("skillleveltable_rune.tsv");
+        let test_path = PathBuf::from("./test/skillleveltable_rune.dnt");
+        println!("Test output: {:?}", temp_path);
+        convert_to_tsv(&test_path, &temp_path).unwrap();
+        let digest = sha256::try_digest(temp_path).unwrap();
+        assert_eq!(digest, "7ec02650c896da60e172b8e53539eea2bda67cd7b23002d8c954a4d4fdece0b7");
+    }
+}
