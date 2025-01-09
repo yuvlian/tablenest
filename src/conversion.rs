@@ -3,8 +3,8 @@ use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::time::Instant;
 use byteorder::WriteBytesExt;
-use read_from::ReadFrom;
-use crate::dnt::{Column, Header, FLOAT32, FLOAT64, INT32, LPNNTS, UINT32, UINT8};
+use read_from::{ReadFrom, WriteTo};
+use crate::dnt::{Column, Header, WriteCell, FLOAT32, FLOAT64, INT32, LPNNTS, UINT32, UINT8};
 
 pub fn convert_to_tsv(input_path: &PathBuf, output_path: &PathBuf) -> io::Result<()> {
     let start = Instant::now();
@@ -16,7 +16,7 @@ pub fn convert_to_tsv(input_path: &PathBuf, output_path: &PathBuf) -> io::Result
 
     // header
     let header = Header::read_from(&mut reader)?;
-    println!("Rows: {}, Cols: {}", header.row_count, header.column_count);
+    println!("Rows: {:?}, Cols: {:?}", header.row_count, header.column_count);
 
     // columns
     let column_count = header.column_count.0 as usize + 1;
@@ -41,16 +41,15 @@ pub fn convert_to_tsv(input_path: &PathBuf, output_path: &PathBuf) -> io::Result
             if i > 0 {
                 writer.write_u8(tab)?;
             }
-            let cell = match columns[i].data_type.0 {
-                1 => LPNNTS::read_from(&mut reader)?.to_string(),
-                2 => INT32::read_from(&mut reader)?.to_string(),
-                3 => UINT32::read_from(&mut reader)?.to_string(),
-                4 => FLOAT32::read_from(&mut reader)?.to_string(),
-                5 => FLOAT32::read_from(&mut reader)?.to_string(),
-                6 => FLOAT64::read_from(&mut reader)?.to_string(),
+            match columns[i].data_type.0 {
+                1 => LPNNTS::read_from(&mut reader)?.write_to(&mut writer)?,
+                2 => INT32::read_from(&mut reader)?.write_to(&mut writer)?,
+                3 => UINT32::read_from(&mut reader)?.write_to(&mut writer)?,
+                4 => FLOAT32::read_from(&mut reader)?.write_to(&mut writer)?,
+                5 => FLOAT32::read_from(&mut reader)?.write_to(&mut writer)?,
+                6 => FLOAT64::read_from(&mut reader)?.write_to(&mut writer)?,
                 x => return Err(io::Error::new(io::ErrorKind::InvalidData, format!("Invalid column type: {}", x))),
             };
-            writer.write(cell.as_bytes())?;
         }
         writer.write_u8(new_line)?;
     }

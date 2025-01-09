@@ -1,7 +1,32 @@
-use std::fmt::{write, Display, Formatter};
+use std::fmt::{Display};
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{self, ErrorKind, Read};
-use read_from::ReadFrom;
+use std::io::{self, ErrorKind, Read, Write};
+use read_from::{ReadFrom};
+
+pub trait WriteCell {
+    /// What error can happen when trying to write?
+    type Error;
+
+    /// Attempts to write `self` to the given output stream, returning the number
+    /// of bytes written on success.
+    fn write_to<W: Write>(&self, output: W) -> Result<(), Self::Error>;
+}
+
+macro_rules! impl_write_cell {
+    ($type:ty) => {
+        impl WriteCell for $type {
+            type Error = io::Error;
+
+            fn write_to<W: Write>(&self, mut output: W) -> Result<(), Self::Error> {
+                write!(&mut output, "{}", self.0)
+            }
+        }
+    };
+    // Multiple types variant
+    ( $( $type:ty ),+ ) => {
+        $( impl_write_cell!($type); )+
+    };
+}
 
 #[derive(Debug, Clone)]
 pub struct UINT8(pub u8);
@@ -14,12 +39,6 @@ impl ReadFrom for UINT8 {
     }
 }
 
-impl Display for UINT8 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct UINT16(pub u16);
 
@@ -28,12 +47,6 @@ impl ReadFrom for UINT16 {
 
     fn read_from<R: Read>(mut input: R) -> Result<Self, Self::Error> {
         input.read_u16::<LittleEndian>().map(|x| UINT16(x))
-    }
-}
-
-impl Display for UINT16 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
     }
 }
 
@@ -54,28 +67,22 @@ impl ReadFrom for LPNNTS {
     }
 }
 
-impl Display for LPNNTS {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+impl WriteCell for LPNNTS {
+    type Error = io::Error;
+
+    fn write_to<W: Write>(&self, mut output: W) -> Result<(), Self::Error> {
+        write!(&mut output, "{}", self.0)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct UINT32(pub u32);
 
-
 impl ReadFrom for UINT32 {
     type Error = io::Error;
 
     fn read_from<R: Read>(mut input: R) -> Result<Self, Self::Error> {
         input.read_u32::<LittleEndian>().map(|x| UINT32(x))
-    }
-}
-
-
-impl Display for UINT32 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
     }
 }
 
@@ -90,12 +97,6 @@ impl ReadFrom for INT32 {
     }
 }
 
-impl Display for INT32 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct FLOAT32(pub f32);
 
@@ -104,12 +105,6 @@ impl ReadFrom for FLOAT32 {
 
     fn read_from<R: Read>(mut input: R) -> Result<Self, Self::Error> {
         input.read_f32::<LittleEndian>().map(|x| FLOAT32(x))
-    }
-}
-
-impl Display for FLOAT32 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
     }
 }
 
@@ -124,11 +119,7 @@ impl ReadFrom for FLOAT64 {
     }
 }
 
-impl Display for FLOAT64 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+impl_write_cell!(UINT8, UINT16, UINT32, INT32, FLOAT32, FLOAT64);
 
 #[derive(Debug, Clone)]
 pub struct Header {
