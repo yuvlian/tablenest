@@ -1,5 +1,3 @@
-cargo-features = ["codegen-backend"]
-
 [package]
 name = "tablenest"
 version = "0.0.1"
@@ -7,66 +5,18 @@ edition = "2024"
 
 [dependencies]
 byteorder = "1.5.0"
-indexmap = "2.7.0"
-rayon = "1.10.0"
+itoa = "1.0.14"
+ryu = "1.0.18"
+read-from = "0.5.2"
 rfd = "0.15.2"
 walkdir = "2.5.0"
 
-# # Commented by default
-# [[bin]]
-# name = "tablenest"
-# path = "src/main.rs"
-
-# [lib]
-# name = "tablenest"
-# path = "src/lib.rs"
+[dev-dependencies]
+sha256 = "1.5.0"
+tempfile = "3.8"
 
 [profile.release]
-codegen-backend = "llvm"
 opt-level = 3
-debug = false
-split-debuginfo = "..."
-strip = true
-debug-assertions = false
-overflow-checks = false
-lto = "fat"
-panic = "unwind"
-incremental = false
-codegen-units = 1
-rpath = false
-
-[profile.release.build-override]
-codegen-backend = "llvm"
-opt-level = 3
-debug = false
-split-debuginfo = "..."
-strip = true
-debug-assertions = false
-overflow-checks = false
-incremental = false
-codegen-units = 1
 
 [profile.dev]
-codegen-backend = "cranelift"
-opt-level = 0
-debug = true
-split-debuginfo = "..."
-strip = "none"
-debug-assertions = true
-overflow-checks = true
-lto = "off"
-panic = "abort"
-incremental = true
-codegen-units = 384
-rpath = false
-
-[profile.dev.build-override]
-codegen-backend = "cranelift"
-opt-level = 0
-debug = true
-split-debuginfo = "..."
-strip = "none"
-debug-assertions = true
-overflow-checks = true
-incremental = true
-codegen-units = 384
+opt-level = 3

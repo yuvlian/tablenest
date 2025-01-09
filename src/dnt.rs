@@ -1,89 +1,178 @@
 use byteorder::{LittleEndian, ReadBytesExt};
-use indexmap::IndexMap;
-use std::fs::File;
-use std::io::{self, BufReader, Read, Seek, SeekFrom};
+use read_from::ReadFrom;
+use std::io::{self, Read, Write};
 
-#[derive(Debug, Clone, Copy)]
-pub enum ColumnType {
-    String = 1,
-    Int32 = 2,
-    UInt32 = 3,
-    Float32 = 4,
-    Float32Alt = 5,
-    Float64 = 6,
+pub trait WriteCell {
+    /// What error can happen when trying to write?
+    type Error;
+
+    /// Attempts to write `self` to the given output stream, returning the number
+    /// of bytes written on success.
+    fn write_to<W: Write>(&self, output: W) -> Result<(), Self::Error>;
 }
 
-impl TryFrom<u8> for ColumnType {
+macro_rules! impl_write_int_cell {
+    ($type:ty) => {
+        impl WriteCell for $type {
+            type Error = io::Error;
+
+            fn write_to<W: Write>(&self, mut output: W) -> Result<(), Self::Error> {
+                let mut buf = itoa::Buffer::new();
+                let printed = buf.format(self.0).as_bytes();
+                output.write(printed)?;
+                Ok(())
+            }
+        }
+    };
+    // Multiple types variant
+    ( $( $type:ty ),+ ) => {
+        $( impl_write_int_cell!($type); )+
+    };
+}
+
+macro_rules! impl_write_float_cell {
+    ($type:ty) => {
+        impl WriteCell for $type {
+            type Error = io::Error;
+
+            fn write_to<W: Write>(&self, mut output: W) -> Result<(), Self::Error> {
+                let mut buf = ryu::Buffer::new();
+                let printed = buf.format(self.0).as_bytes();
+                output.write(printed)?;
+                Ok(())
+            }
+        }
+    };
+    // Multiple types variant
+    ( $( $type:ty ),+ ) => {
+        $( impl_write_float_cell!($type); )+
+    };
+}
+
+#[derive(Debug, Clone)]
+pub struct UINT8(pub u8);
+
+impl ReadFrom for UINT8 {
     type Error = io::Error;
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            1 => Ok(ColumnType::String),
-            2 => Ok(ColumnType::Int32),
-            3 => Ok(ColumnType::UInt32),
-            4 => Ok(ColumnType::Float32),
-            5 => Ok(ColumnType::Float32Alt),
-            6 => Ok(ColumnType::Float64),
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid column type",
-            )),
-        }
+    fn read_from<R: Read>(mut input: R) -> Result<Self, Self::Error> {
+        input.read_u8().map(|x| UINT8(x))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UINT16(pub u16);
+
+impl ReadFrom for UINT16 {
+    type Error = io::Error;
+
+    fn read_from<R: Read>(mut input: R) -> Result<Self, Self::Error> {
+        input.read_u16::<LittleEndian>().map(|x| UINT16(x))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LPNNTS(pub Vec<u8>);
+
+impl ReadFrom for LPNNTS {
+    type Error = io::Error;
+
+    fn read_from<R: Read>(mut input: R) -> Result<Self, Self::Error> {
+        let len = UINT16::read_from(&mut input)?;
+        let mut buffer = vec![0u8; len.0 as usize];
+        input.read_exact(&mut buffer)?;
+        Ok(LPNNTS(buffer))
+    }
+}
+
+impl WriteCell for LPNNTS {
+    type Error = io::Error;
+
+    fn write_to<W: Write>(&self, mut output: W) -> Result<(), Self::Error> {
+        output.write(&self.0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct UINT32(pub u32);
+
+impl ReadFrom for UINT32 {
+    type Error = io::Error;
+
+    fn read_from<R: Read>(mut input: R) -> Result<Self, Self::Error> {
+        input.read_u32::<LittleEndian>().map(|x| UINT32(x))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct INT32(pub i32);
+
+impl ReadFrom for INT32 {
+    type Error = io::Error;
+
+    fn read_from<R: Read>(mut input: R) -> Result<Self, Self::Error> {
+        input.read_i32::<LittleEndian>().map(|x| INT32(x))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FLOAT32(pub f32);
+
+impl ReadFrom for FLOAT32 {
+    type Error = io::Error;
+
+    fn read_from<R: Read>(mut input: R) -> Result<Self, Self::Error> {
+        input.read_f32::<LittleEndian>().map(|x| FLOAT32(x))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FLOAT64(pub f64);
+
+impl ReadFrom for FLOAT64 {
+    type Error = io::Error;
+
+    fn read_from<R: Read>(mut input: R) -> Result<Self, Self::Error> {
+        input.read_f64::<LittleEndian>().map(|x| FLOAT64(x))
+    }
+}
+
+impl_write_int_cell!(UINT8, UINT16, UINT32, INT32);
+impl_write_float_cell!(FLOAT32, FLOAT64);
+
+#[derive(Debug, Clone)]
+pub struct Header {
+    pub magic_number: UINT32,
+    pub column_count: UINT16,
+    pub row_count: UINT32,
+}
+
+impl ReadFrom for Header {
+    type Error = io::Error;
+
+    fn read_from<R: Read>(mut input: R) -> Result<Self, Self::Error> {
+        Ok(Header {
+            magic_number: UINT32::read_from(&mut input)?,
+            column_count: UINT16::read_from(&mut input)?,
+            row_count: UINT32::read_from(&mut input)?,
+        })
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Column {
-    pub column_type: ColumnType,
+    pub name: LPNNTS,
+    pub data_type: UINT8,
 }
 
-impl Column {
-    #[inline]
-    fn u32_column() -> Self {
-        Self {
-            column_type: ColumnType::UInt32,
-        }
+impl ReadFrom for Column {
+    type Error = io::Error;
+
+    fn read_from<R: Read>(mut input: R) -> Result<Self, Self::Error> {
+        Ok(Column {
+            name: LPNNTS::read_from(&mut input)?,
+            data_type: UINT8::read_from(&mut input)?,
+        })
     }
-}
-
-#[derive(Debug)]
-pub struct DntHeader {
-    pub row_count: u32,
-    pub columns: IndexMap<String, Column>,
-}
-
-impl DntHeader {
-    pub fn read(reader: &mut BufReader<File>) -> io::Result<Self> {
-        reader.seek(SeekFrom::Current(4))?;
-
-        let column_count = reader.read_u16::<LittleEndian>()? as usize;
-        let row_count = reader.read_u32::<LittleEndian>()?;
-
-        let mut columns = IndexMap::with_capacity(column_count + 1);
-        columns.insert(String::from("_RowID|3"), Column::u32_column());
-
-        let mut buffer = Vec::new();
-
-        for _ in 0..column_count {
-            let name = read_string(reader, &mut buffer)?;
-            let column_type = ColumnType::try_from(reader.read_u8()?)?;
-            columns.insert(name, Column { column_type });
-        }
-
-        Ok(DntHeader { row_count, columns })
-    }
-}
-
-fn read_string(reader: &mut BufReader<File>, buffer: &mut Vec<u8>) -> io::Result<String> {
-    let length = reader.read_u16::<LittleEndian>()? as usize;
-    buffer.clear();
-    buffer.reserve(length);
-    reader.take(length as u64).read_to_end(buffer)?;
-    String::from_utf8(buffer.clone())
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))
-}
-
-pub struct RowData {
-    pub row_id: u32,
-    pub raw_data: Vec<u8>,
 }
