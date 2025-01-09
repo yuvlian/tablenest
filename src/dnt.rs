@@ -11,19 +11,41 @@ pub trait WriteCell {
     fn write_to<W: Write>(&self, output: W) -> Result<(), Self::Error>;
 }
 
-macro_rules! impl_write_cell {
+macro_rules! impl_write_int_cell {
     ($type:ty) => {
         impl WriteCell for $type {
             type Error = io::Error;
 
             fn write_to<W: Write>(&self, mut output: W) -> Result<(), Self::Error> {
-                write!(&mut output, "{}", self.0)
+                let mut buf = itoa::Buffer::new();
+                let printed = buf.format(self.0).as_bytes();
+                output.write(printed)?;
+                Ok(())
             }
         }
     };
     // Multiple types variant
     ( $( $type:ty ),+ ) => {
-        $( impl_write_cell!($type); )+
+        $( impl_write_int_cell!($type); )+
+    };
+}
+
+macro_rules! impl_write_float_cell {
+    ($type:ty) => {
+        impl WriteCell for $type {
+            type Error = io::Error;
+
+            fn write_to<W: Write>(&self, mut output: W) -> Result<(), Self::Error> {
+                let mut buf = ryu::Buffer::new();
+                let printed = buf.format(self.0).as_bytes();
+                output.write(printed)?;
+                Ok(())
+            }
+        }
+    };
+    // Multiple types variant
+    ( $( $type:ty ),+ ) => {
+        $( impl_write_float_cell!($type); )+
     };
 }
 
@@ -116,7 +138,8 @@ impl ReadFrom for FLOAT64 {
     }
 }
 
-impl_write_cell!(UINT8, UINT16, UINT32, INT32, FLOAT32, FLOAT64);
+impl_write_int_cell!(UINT8, UINT16, UINT32, INT32);
+impl_write_float_cell!(FLOAT32, FLOAT64);
 
 #[derive(Debug, Clone)]
 pub struct Header {

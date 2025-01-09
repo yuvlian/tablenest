@@ -86,7 +86,7 @@ mod tests {
         let digest = sha256::try_digest(temp_path).unwrap();
         assert_eq!(
             digest,
-            "7ec02650c896da60e172b8e53539eea2bda67cd7b23002d8c954a4d4fdece0b7"
+            "8104cb51cfa3a37f5cfe4930cc88a71fc7172c06e9cc2af4da27f39375d9e70a"
         );
     }
 }
