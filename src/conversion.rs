@@ -23,23 +23,18 @@ pub fn convert_to_tsv(input_path: &PathBuf, output_path: &PathBuf) -> io::Result
         ));
     }
 
-    println!(
-        "Rows: {:?}, Cols: {:?}",
-        header.row_count, header.column_count
-    );
-
     // columns
     let column_count = header.column_count.0 as usize + 1;
     let mut columns: Vec<Column> = Vec::with_capacity(column_count);
     columns.push(Column {
-        name: LPNNTS("_RowID|3".to_string()),
+        name: LPNNTS("_RowID|3".as_bytes().to_vec()),
         data_type: UINT8(2), // UINT32
     });
     writer.write("_RowID|3".as_bytes())?;
     for _ in 1..column_count {
         writer.write_u8(tab)?;
         let col = Column::read_from(&mut reader)?;
-        writer.write(col.name.0.as_bytes())?;
+        col.name.write_to(&mut writer)?;
         columns.push(col);
     }
     writer.write_u8(new_line)?;

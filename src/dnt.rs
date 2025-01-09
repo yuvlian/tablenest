@@ -1,6 +1,6 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use read_from::ReadFrom;
-use std::io::{self, ErrorKind, Read, Write};
+use std::io::{self, Read, Write};
 
 pub trait WriteCell {
     /// What error can happen when trying to write?
@@ -50,7 +50,7 @@ impl ReadFrom for UINT16 {
 }
 
 #[derive(Debug, Clone)]
-pub struct LPNNTS(pub String);
+pub struct LPNNTS(pub Vec<u8>);
 
 impl ReadFrom for LPNNTS {
     type Error = io::Error;
@@ -59,10 +59,7 @@ impl ReadFrom for LPNNTS {
         let len = UINT16::read_from(&mut input)?;
         let mut buffer = vec![0u8; len.0 as usize];
         input.read_exact(&mut buffer)?;
-        match String::from_utf8(buffer) {
-            Ok(str) => Ok(LPNNTS(str)),
-            Err(e) => Err(io::Error::new(ErrorKind::Other, e)),
-        }
+        Ok(LPNNTS(buffer))
     }
 }
 
@@ -70,7 +67,8 @@ impl WriteCell for LPNNTS {
     type Error = io::Error;
 
     fn write_to<W: Write>(&self, mut output: W) -> Result<(), Self::Error> {
-        write!(&mut output, "{}", self.0)
+        output.write(&self.0)?;
+        Ok(())
     }
 }
 
