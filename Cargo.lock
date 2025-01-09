@@ -1015,6 +1015,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "read-from"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b35ce23c8c9f2700bf676586f2d4abfb6620fd42090dcdff49c57af9f1ba2d79"
+
+[[package]]
 name = "rfd"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1168,6 +1174,7 @@ dependencies = [
  "byteorder",
  "indexmap",
  "rayon",
+ "read-from",
  "rfd",
  "walkdir",
 ]
