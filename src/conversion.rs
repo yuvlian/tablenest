@@ -1,8 +1,8 @@
-use crate::dnt::{Column, FLOAT32, FLOAT64, Header, INT32, LPNNTS, UINT8, UINT32, WriteCell};
+use crate::dnt::{Column, FLOAT32, FLOAT64, Header, INT32, LPNNTS, UINT8, UINT32, WriteCell, UINT16};
 use crate::io_utils::{create_reader, create_writer};
 use byteorder::WriteBytesExt;
 use read_from::{ReadFrom};
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -47,7 +47,11 @@ pub fn convert_to_tsv(input_path: &PathBuf, output_path: &PathBuf) -> io::Result
                 writer.write_u8(tab)?;
             }
             match columns[i].data_type.0 {
-                1 => LPNNTS::read_from(&mut reader)?.write_to(&mut writer)?,
+                1 => {
+                    let len = UINT16::read_from(&mut reader)?;
+                    let mut handle = reader.by_ref().take(len.0 as u64);
+                    io::copy(&mut handle, &mut writer)?;
+                }
                 2 => INT32::read_from(&mut reader)?.write_to(&mut writer)?,
                 3 => UINT32::read_from(&mut reader)?.write_to(&mut writer)?,
                 4 => FLOAT32::read_from(&mut reader)?.write_to(&mut writer)?,
